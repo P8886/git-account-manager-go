@@ -86,6 +86,71 @@ func main() {
 	sshEntry := widget.NewEntry()
 	sshEntry.PlaceHolder = "SSH 私钥路径 (可选)"
 
+	// --- SSH Key Management UI ---
+	var loadSSHKeys func()
+	sshSelect := widget.NewSelect([]string{}, func(s string) {
+		if s != "" {
+			sshEntry.SetText(s)
+		}
+	})
+	sshSelect.PlaceHolder = "快速选择已有密钥..."
+
+	loadSSHKeys = func() {
+		keys, err := gitops.ListSSHKeys()
+		if err == nil {
+			sshSelect.Options = keys
+			sshSelect.Refresh()
+		}
+	}
+	loadSSHKeys() // Initial load
+
+	refreshKeysBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		loadSSHKeys()
+		dialog.ShowInformation("刷新", fmt.Sprintf("发现 %d 个密钥", len(sshSelect.Options)), myWindow)
+	})
+
+	generateKeyBtn := widget.NewButton("生成新密钥", func() {
+		keyNameEntry := widget.NewEntry()
+		keyNameEntry.SetText("id_ed25519_new")
+		keyEmailEntry := widget.NewEntry()
+		if emailEntry.Text != "" {
+			keyEmailEntry.SetText(emailEntry.Text)
+		} else {
+			keyEmailEntry.SetText("your@email.com")
+		}
+		keyTypeSelect := widget.NewSelect([]string{"ed25519", "rsa"}, nil)
+		keyTypeSelect.SetSelected("ed25519")
+
+		items := []*widget.FormItem{
+			widget.NewFormItem("密钥文件名", keyNameEntry),
+			widget.NewFormItem("关联邮箱", keyEmailEntry),
+			widget.NewFormItem("加密类型", keyTypeSelect),
+		}
+
+		dialog.ShowForm("生成 SSH 密钥", "生成", "取消", items, func(b bool) {
+			if b {
+				name := keyNameEntry.Text
+				email := keyEmailEntry.Text
+				kType := keyTypeSelect.Selected
+
+				if name == "" || email == "" {
+					dialog.ShowError(fmt.Errorf("请填写完整信息"), myWindow)
+					return
+				}
+
+				path, err := gitops.GenerateSSHKey(name, email, kType)
+				if err != nil {
+					dialog.ShowError(err, myWindow)
+				} else {
+					dialog.ShowInformation("成功", "密钥生成成功: "+path, myWindow)
+					loadSSHKeys()
+					sshSelect.SetSelected(path)
+				}
+			}
+		}, myWindow)
+	})
+	// -----------------------------
+
 	sshSelectBtn := widget.NewButtonWithIcon("浏览", theme.FolderOpenIcon(), func() {
 		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
@@ -94,12 +159,18 @@ func main() {
 		}, myWindow)
 	})
 
+	sshFormItemWidget := container.NewVBox(
+		container.NewHBox(layout.NewSpacer(), generateKeyBtn, refreshKeysBtn),
+		sshSelect,
+		container.NewBorder(nil, nil, nil, sshSelectBtn, sshEntry),
+	)
+
 	form := container.NewVBox(
 		widget.NewLabel("添加/编辑账户"),
 		widget.NewForm(
 			widget.NewFormItem("用户名", nameEntry),
 			widget.NewFormItem("邮箱", emailEntry),
-			widget.NewFormItem("SSH Key", container.NewBorder(nil, nil, nil, sshSelectBtn, sshEntry)),
+			widget.NewFormItem("SSH Key", sshFormItemWidget),
 		),
 	)
 
