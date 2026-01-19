@@ -1,0 +1,16 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Fyne
+fyne-cross/
+
+# IDEs
+.vscode/
+.idea/
+
+# Go
+go.work
