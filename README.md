@@ -33,10 +33,23 @@ go build -ldflags="-H windowsgui -s -w" -o GitAccountManager.exe main.go
 *   `-s -w`: 去除调试信息和符号表，这是**减小体积的关键参数**。
 *   打包后体积预期：**约 15MB**。
 
-**macOS / Linux**:
+**Linux / macOS**:
 ```bash
 go build -ldflags="-s -w" -o GitAccountManager main.go
 ```
+
+**macOS**:
+macOS 可以直接运行 `go build` 生成的二进制文件，但为了获得最佳体验（图标、Dock 栏支持），建议打包为 `.app`：
+
+1. 安装 Fyne 命令行工具：
+   ```bash
+   go install fyne.io/fyne/v2/cmd/fyne@latest
+   ```
+2. 打包为 `.app` 应用：
+   ```bash
+   fyne package -os darwin -icon icon.png
+   ```
+   *生成的 `.app` 可以直接双击运行。如需制作 `.dmg` 安装包，通常需要使用 `create-dmg` 等工具对 `.app` 进行封装，或者使用下方的 `fyne-cross` 方案。*
 
 ### 3. 一键跨平台打包 (推荐方案)
 如果你不想在 Windows 上安装 GCC，或者需要打包 Mac/Linux 版本，最简单的方法是使用 Docker + `fyne-cross`。

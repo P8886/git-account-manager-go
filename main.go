@@ -165,8 +165,9 @@ func main() {
 		container.NewBorder(nil, nil, nil, sshSelectBtn, sshEntry),
 	)
 
+	formLabel := widget.NewLabel("添加新账户")
 	form := container.NewVBox(
-		widget.NewLabel("添加/编辑账户"),
+		formLabel,
 		widget.NewForm(
 			widget.NewFormItem("用户名", nameEntry),
 			widget.NewFormItem("邮箱", emailEntry),
@@ -175,28 +176,51 @@ func main() {
 	)
 
 	var refreshList func()
+	var currentEditingID string = "" // 当前正在编辑的 Account ID，空字符串表示新增模式
 
-	addBtn := widget.NewButtonWithIcon("保存账户", theme.DocumentSaveIcon(), func() {
+	addBtn := widget.NewButtonWithIcon("添加账户", theme.DocumentSaveIcon(), func() {
 		if nameEntry.Text == "" || emailEntry.Text == "" {
 			dialog.ShowError(fmt.Errorf("用户名和邮箱不能为空"), myWindow)
 			return
 		}
 
-		newAcc := storage.Account{
-			ID:         fmt.Sprintf("%d", time.Now().UnixMilli()),
-			Name:       nameEntry.Text,
-			Email:      emailEntry.Text,
-			SSHKeyPath: sshEntry.Text,
+		if currentEditingID != "" {
+			// 更新模式
+			for i, acc := range config.Accounts {
+				if acc.ID == currentEditingID {
+					config.Accounts[i].Name = nameEntry.Text
+					config.Accounts[i].Email = emailEntry.Text
+					config.Accounts[i].SSHKeyPath = sshEntry.Text
+					break
+				}
+			}
+			storage.SaveConfig(config)
+			refreshList()
+			dialog.ShowInformation("成功", "账户更新成功", myWindow)
+		} else {
+			// 新增模式
+			newAcc := storage.Account{
+				ID:         fmt.Sprintf("%d", time.Now().UnixMilli()),
+				Name:       nameEntry.Text,
+				Email:      emailEntry.Text,
+				SSHKeyPath: sshEntry.Text,
+			}
+			config.Accounts = append(config.Accounts, newAcc)
+			storage.SaveConfig(config)
+			
+			// 清空表单
+			nameEntry.SetText("")
+			emailEntry.SetText("")
+			sshEntry.SetText("")
+			refreshList()
+			dialog.ShowInformation("成功", "账户添加成功", myWindow)
 		}
-
-		config.Accounts = append(config.Accounts, newAcc)
-		storage.SaveConfig(config)
-
-		nameEntry.SetText("")
-		emailEntry.SetText("")
-		sshEntry.SetText("")
-		refreshList()
 	})
+
+	cancelEditBtn := widget.NewButtonWithIcon("取消编辑 / 重置", theme.ContentClearIcon(), func() {
+		accountList.UnselectAll()
+	})
+	cancelEditBtn.Hide() // 默认隐藏，只有在选中时显示
 
 	deleteBtn := widget.NewButtonWithIcon("删除选中", theme.DeleteIcon(), func() {
 		// Logic handled in OnSelected
@@ -215,17 +239,32 @@ func main() {
 		deleteBtn.Enable()
 		switchBtn.Enable()
 
-		// Fill form for quick copy/edit (optional)
+		// Fill form for edit
 		acc := config.Accounts[id]
 		nameEntry.SetText(acc.Name)
 		emailEntry.SetText(acc.Email)
 		sshEntry.SetText(acc.SSHKeyPath)
+
+		// 进入编辑模式
+		currentEditingID = acc.ID
+		addBtn.SetText("更新账户")
+		formLabel.SetText(fmt.Sprintf("编辑账户: %s", acc.Name))
+		cancelEditBtn.Show()
 	}
 
 	accountList.OnUnselected = func(id widget.ListItemID) {
 		currentSelectedID = -1
 		deleteBtn.Disable()
 		switchBtn.Disable()
+
+		// 退出编辑模式
+		currentEditingID = ""
+		nameEntry.SetText("")
+		emailEntry.SetText("")
+		sshEntry.SetText("")
+		addBtn.SetText("添加账户")
+		formLabel.SetText("添加新账户")
+		cancelEditBtn.Hide()
 	}
 
 	deleteBtn.OnTapped = func() {
@@ -269,6 +308,7 @@ func main() {
 	rightSide := container.NewVBox(
 		form,
 		addBtn,
+		cancelEditBtn,
 		layout.NewSpacer(),
 		widget.NewSeparator(),
 		container.NewHBox(switchBtn, deleteBtn),
