@@ -47,6 +47,14 @@ func main() {
 	}
 	updateStatus()
 
+	showSuccessToast := func(msg string) {
+		dlg := dialog.NewInformation("成功", msg, myWindow)
+		dlg.Show()
+		time.AfterFunc(1500*time.Millisecond, func() {
+			dlg.Hide()
+		})
+	}
+
 	accountList := widget.NewList(
 		func() int {
 			return len(config.Accounts)
@@ -196,7 +204,7 @@ func main() {
 			}
 			storage.SaveConfig(config)
 			refreshList()
-			dialog.ShowInformation("成功", "账户更新成功", myWindow)
+			showSuccessToast("账户更新成功")
 		} else {
 			// 新增模式
 			newAcc := storage.Account{
@@ -213,7 +221,7 @@ func main() {
 			emailEntry.SetText("")
 			sshEntry.SetText("")
 			refreshList()
-			dialog.ShowInformation("成功", "账户添加成功", myWindow)
+			showSuccessToast("账户添加成功")
 		}
 	})
 
@@ -294,7 +302,7 @@ func main() {
 				storage.SaveConfig(config)
 				updateStatus()
 				refreshList()
-				dialog.ShowInformation("成功", fmt.Sprintf("已切换到 %s", acc.Name), myWindow)
+				showSuccessToast(fmt.Sprintf("已切换到 %s", acc.Name))
 			}
 		}
 	}
